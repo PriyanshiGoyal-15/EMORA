@@ -178,8 +178,8 @@ export default function SigninPage() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between px-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.1em]">Password</label>
-                <Link href="#" className="text-[10px] font-bold text-primary hover:underline tracking-tight uppercase">Forgot password?</Link>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Password</label>
+                {/* <Link href="#" className="text-[10px] font-bold text-primary hover:underline tracking-tight uppercase">Forgot password?</Link> */}
               </div>
               <div className="relative group">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-primary transition-colors" />

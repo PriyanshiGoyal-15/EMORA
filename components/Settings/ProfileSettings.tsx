@@ -152,7 +152,11 @@ export default function ProfileSettings() {
       await signOut(auth);
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Failed to delete account');
+      if (err.code === 'auth/requires-recent-login') {
+        alert('For security, you must sign out and sign back in again before you can delete your account.');
+      } else {
+        alert(err.message || 'Failed to delete account');
+      }
       setIsDeleting(false);
       setShowDeleteConfirm(false);
     }

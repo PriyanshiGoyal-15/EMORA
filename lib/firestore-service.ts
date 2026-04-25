@@ -455,6 +455,13 @@ export const moodService = {
     };
   },
 
+  async clearMoodHistory(userId: string) {
+    const q = query(collection(db, 'moods'), where('userId', '==', userId));
+    const snapshot = await getDocs(q);
+    const deletePromises = snapshot.docs.map(d => deleteDoc(doc(db, 'moods', d.id)));
+    await Promise.all(deletePromises);
+  },
+
   async getMoodStats(userId: string) {
     try {
       const moodsSnapshot = await getDocs(query(
