@@ -1,12 +1,15 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useSession, signOut } from 'next-auth/react';
+import { useAuth } from '@/context/AuthContext';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { userService } from '@/lib/firestore-service';
 import { Camera, Mail, User, Briefcase, MapPin, Loader2, CheckCircle2, Trash2, AlertTriangle } from 'lucide-react';
 import DeleteAccountModal from './DeleteAccountModal';
 
 export default function ProfileSettings() {
-  const { data: session, update } = useSession();
+  const { user, setUserImage } = useAuth();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -25,18 +28,20 @@ export default function ProfileSettings() {
 
   useEffect(() => {
     const fetchSettings = async () => {
+      if (!user) return;
       try {
-        const res = await fetch(`/api/user/settings?t=${Date.now()}`);
-        const data = await res.json();
-        if (res.ok) {
+        const data = await userService.getSettings(user.uid);
+        if (data) {
           setFormData({
             name: data.name || '',
-            email: data.email || '',
+            email: data.email || user.email || '',
             bio: data.bio || '',
             jobTitle: data.jobTitle || '',
             location: data.location || '',
             image: data.image || ''
           });
+        } else {
+          setFormData(prev => ({ ...prev, email: user.email || '' }));
         }
       } catch (err) {
         console.error("Failed to fetch settings", err);
@@ -45,19 +50,64 @@ export default function ProfileSettings() {
       }
     };
 
-    fetchSettings();
-  }, []);
+    if (user) fetchSettings();
+  }, [user]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        setMessage({ type: 'error', text: 'File size too large (max 2MB)' });
+      if (file.size > 10 * 1024 * 1024) {
+        setMessage({ type: 'error', text: 'File is too large (max 10MB)' });
         return;
       }
+
+      setMessage({ type: 'info', text: 'Processing image...' });
+
       const reader = new FileReader();
       reader.onloadend = () => {
-        setFormData({ ...formData, image: reader.result as string });
+        const img = new Image();
+        img.src = reader.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_SIZE = 150; // Ultra compact
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+          }
+
+          // Quality 0.4 for maximum safety
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.4);
+
+          setFormData(prev => ({ ...prev, image: compressedDataUrl }));
+          setMessage({ type: '', text: '' });
+
+          console.log('Compressed image length:', compressedDataUrl.length);
+          if (compressedDataUrl.length > 500000) {
+            setMessage({ type: 'error', text: 'Selected image is still too complex. Please try a different one.' });
+          }
+        };
+        img.onerror = () => {
+          setMessage({ type: 'error', text: 'Failed to process image format.' });
+        };
       };
       reader.readAsDataURL(file);
     }
@@ -65,59 +115,50 @@ export default function ProfileSettings() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
+
+    // Check total payload size roughly
+    const payloadSize = JSON.stringify(formData).length;
+    if (payloadSize > 1000000) {
+      setMessage({ type: 'error', text: 'Profile data is too large. Try removing the photo or shortening your bio.' });
+      return;
+    }
+
     setLoading(true);
     setMessage({ type: '', text: '' });
 
     try {
-      const res = await fetch('/api/user/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-
-      if (res.ok) {
-        setMessage({ type: 'success', text: 'Profile updated successfully' });
-        if (session) {
-          await update({
-            ...session,
-            user: {
-              ...session.user,
-              name: formData.name,
-              image: formData.image
-            }
-          });
-        }
+      await userService.updateSettings(user.uid, formData);
+      setUserImage(formData.image || null); // ← instant Topbar update
+      setMessage({ type: 'success', text: 'Profile updated successfully' });
+    } catch (err: any) {
+      console.error(err);
+      if (err.message?.includes('longer than 1048487 bytes')) {
+        setMessage({ type: 'error', text: 'Database limit exceeded. Please remove the photo and save again.' });
       } else {
-        const data = await res.json();
-        setMessage({ type: 'error', text: data.error || 'Failed to update profile' });
+        setMessage({ type: 'error', text: 'Failed to save changes. Please try again.' });
       }
-    } catch (err) {
-      setMessage({ type: 'error', text: 'Something went wrong' });
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteAccount = async () => {
+    if (!user) return;
     setIsDeleting(true);
     try {
-      const res = await fetch('/api/user/settings', { method: 'DELETE' });
-      if (res.ok) {
-        await signOut({ callbackUrl: '/' });
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to delete account');
-        setIsDeleting(false);
-        setShowDeleteConfirm(false);
-      }
-    } catch (err) {
+      await userService.deleteAccountData(user.uid);
+      await user.delete();
+      await signOut(auth);
+    } catch (err: any) {
       console.error(err);
+      alert(err.message || 'Failed to delete account');
       setIsDeleting(false);
       setShowDeleteConfirm(false);
     }
   };
 
-  const userInitial = formData.name ? formData.name[0].toUpperCase() : session?.user?.email ? session.user.email[0].toUpperCase() : '?';
+  const userInitial = formData.name ? formData.name[0].toUpperCase() : user?.email ? user.email[0].toUpperCase() : '?';
 
   if (fetching) {
     return (
@@ -134,7 +175,6 @@ export default function ProfileSettings() {
         <p className="text-gray-500 text-sm mt-1">Manage your public information and how others see you.</p>
       </div>
 
-      {/* Avatar Section */}
       <div className="flex flex-col sm:flex-row items-center gap-6 p-6 rounded-2xl bg-[#f8faff] border border-gray-100">
         <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
         <div onClick={() => fileInputRef.current?.click()} className="relative group cursor-pointer">
@@ -159,7 +199,6 @@ export default function ProfileSettings() {
         </div>
       </div>
 
-      {/* Form Section */}
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
@@ -197,8 +236,9 @@ export default function ProfileSettings() {
         </div>
 
         {message.text && (
-          <div className={`p-4 rounded-xl text-sm font-medium flex items-center gap-3 animate-in fade-in slide-in-from-top-2 ${message.type === 'success' ? 'bg-success/10 text-success' : 'bg-red-50 text-red-500'}`}>
-            <CheckCircle2 className="w-5 h-5 shrink-0" /> {message.text}
+          <div className={`p-4 rounded-xl text-sm font-medium flex items-center gap-3 animate-in fade-in slide-in-from-top-2 ${message.type === 'success' ? 'bg-success/10 text-success' : message.type === 'info' ? 'bg-blue-50 text-blue-500' : 'bg-red-50 text-red-500'}`}>
+            {message.type === 'success' ? <CheckCircle2 className="w-5 h-5 shrink-0" /> : <AlertTriangle className="w-5 h-5 shrink-0" />}
+            {message.text}
           </div>
         )}
 
@@ -209,7 +249,6 @@ export default function ProfileSettings() {
         </div>
       </form>
 
-      {/* Delete Account Section */}
       <div className="pt-8 mt-8 border-t border-gray-100">
         <h3 className="text-lg font-bold text-red-600 flex items-center gap-2">
           <AlertTriangle className="w-5 h-5" /> Danger Zone

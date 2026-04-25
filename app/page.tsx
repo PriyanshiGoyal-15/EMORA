@@ -8,23 +8,17 @@ import MoodBreakdown from '@/components/Dashboard/moodBreakdown';
 import MoodSelector from '@/components/Dashboard/emoji';
 
 export default function Home() {
-  const [refreshTrigger, setRefreshTrigger] = React.useState(0);
-
-  const handleMoodSaved = () => {
-    setRefreshTrigger(prev => prev + 1);
-  };
-
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-      <MoodSelector onMoodSaved={handleMoodSaved} />
-      <KPICard refreshKey={refreshTrigger} />
+      <MoodSelector />
+      <KPICard />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <div className="xl:col-span-2">
-          <MoodGraph refreshKey={refreshTrigger} />
+          <MoodGraph />
         </div>
         <div className="space-y-8">
-          <MoodBreakdown refreshKey={refreshTrigger} />
+          <MoodBreakdown />
         </div>
       </div>
     </div>

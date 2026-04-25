@@ -1,22 +1,25 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { moodService } from '@/lib/firestore-service';
+import { useAuth } from '@/context/AuthContext';
 
 interface CalendarDay {
     date: string;
     moods: string[];
 }
 
-export default function MoodCalendar() {
+export default function MoodCalendar({ refreshKey }: { refreshKey?: number }) {
+    const { user, loading: authLoading } = useAuth();
     const [days, setDays] = useState<CalendarDay[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const MOOD_COLORS: Record<string, string> = {
-        'low': 'bg-purple-300',
-        'sad': 'bg-orange-300',
-        'okay': 'bg-amber-300',
-        'good': 'bg-emerald-300',
-        'great': 'bg-blue-300'
+        'low': 'bg-slate-400',
+        'sad': 'bg-purple-400',
+        'okay': 'bg-amber-400',
+        'good': 'bg-blue-400',
+        'great': 'bg-emerald-400'
     };
 
     // Helper to get background class based on moods
@@ -49,34 +52,29 @@ export default function MoodCalendar() {
     };
 
     useEffect(() => {
-        const fetchCalendarData = async () => {
-            try {
-                const res = await fetch('/api/mood');
-                const data = await res.json();
+        if (authLoading || !user) return;
 
-                if (res.ok && data.calendar) {
-                    const now = new Date();
-                    const year = now.getFullYear();
-                    const month = now.getMonth();
-                    const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const unsubscribe = moodService.subscribeMoodData(user.uid, (data) => {
+            if (data.calendar) {
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = now.getMonth();
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-                    const generatedDays: CalendarDay[] = [];
-                    for (let i = 1; i <= daysInMonth; i++) {
-                        generatedDays.push({
-                            date: `${year}-${month + 1}-${i}`,
-                            moods: data.calendar[i] || []
-                        });
-                    }
-                    setDays(generatedDays);
+                const generatedDays: CalendarDay[] = [];
+                for (let i = 1; i <= daysInMonth; i++) {
+                    generatedDays.push({
+                        date: `${year}-${month + 1}-${i}`,
+                        moods: data.calendar[i] || []
+                    });
                 }
-            } catch (error) {
-                console.error('Error fetching calendar data:', error);
-            } finally {
-                setIsLoading(false);
+                setDays(generatedDays);
             }
-        };
-        fetchCalendarData();
-    }, []);
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [user, authLoading]);
 
     const monthName = new Date().toLocaleDateString('en-US', { month: 'long' });
 

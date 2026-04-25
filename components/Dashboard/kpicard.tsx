@@ -1,26 +1,23 @@
 import React, { useEffect, useState } from 'react'
 import { Heart, BookOpen, MessageCircle, Smile, Loader2 } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
+import { moodService } from '@/lib/firestore-service'
 
 const kpicard = ({ refreshKey }: { refreshKey?: number }) => {
+    const { user, loading: authLoading } = useAuth();
     const [statsData, setStatsData] = useState<any>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const res = await fetch('/api/stats');
-                if (res.ok) {
-                    const data = await res.json();
-                    setStatsData(data);
-                }
-            } catch (error) {
-                console.error("Failed to fetch dashboard stats", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchStats();
-    }, [refreshKey]);
+        if (authLoading || !user) return;
+
+        const unsubscribe = moodService.subscribeGlobalStats(user.uid, (data) => {
+            setStatsData(data);
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [user, authLoading]);
 
     if (isLoading) {
         return (

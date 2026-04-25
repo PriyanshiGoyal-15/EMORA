@@ -2,48 +2,45 @@
 
 import React, { useState } from 'react';
 import { X, Check, Loader2 } from 'lucide-react';
+import { moodService } from '@/lib/firestore-service';
+import { useAuth } from '@/context/AuthContext';
 
 interface MoodLogModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSuccess?: () => void;
+    onMoodSaved?: () => void;
 }
 
 const moods = [
-    { id: 'low', label: 'Low', emoji: '😞', color: 'text-purple-500', bg: 'bg-purple-500/10' },
-    { id: 'sad', label: 'Sad', emoji: '😢', color: 'text-orange-500', bg: 'bg-orange-500/10' },
-    { id: 'okay', label: 'Okay', emoji: '😐', color: 'text-gray-400', bg: 'bg-gray-500/10' },
-    { id: 'good', label: 'Good', emoji: '😊', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-    { id: 'great', label: 'Great', emoji: '😁', color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { id: 'low', label: 'Low', emoji: '😞', color: 'text-slate-500', bg: 'bg-slate-500/10' },
+    { id: 'sad', label: 'Sad', emoji: '😢', color: 'text-purple-500', bg: 'bg-purple-500/10' },
+    { id: 'okay', label: 'Okay', emoji: '😐', color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { id: 'good', label: 'Good', emoji: '😊', color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { id: 'great', label: 'Great', emoji: '😁', color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
 ];
 
-export default function MoodLogModal({ isOpen, onClose, onSuccess }: MoodLogModalProps) {
+export default function MoodLogModal({ isOpen, onClose, onMoodSaved }: MoodLogModalProps) {
+    const { user } = useAuth();
     const [selectedMood, setSelectedMood] = useState<string | null>(null);
     const [note, setNote] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
     const handleSave = async () => {
-        if (!selectedMood) return;
+        if (!selectedMood || !user) return;
 
         setIsSaving(true);
         try {
             const moodData = moods.find(m => m.id === selectedMood);
-            const response = await fetch('/api/mood', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    mood: selectedMood,
-                    label: moodData?.label,
-                    note: note.trim() || undefined
-                }),
+            await moodService.addMood(user.uid, {
+                mood: selectedMood,
+                label: moodData?.label || 'Okay',
+                note: note.trim() || ""
             });
 
-            if (response.ok) {
-                onSuccess?.();
-                onClose();
-                setSelectedMood(null);
-                setNote('');
-            }
+            onMoodSaved?.();
+            onClose();
+            setSelectedMood(null);
+            setNote('');
         } catch (error) {
             console.error('Error logging mood:', error);
         } finally {

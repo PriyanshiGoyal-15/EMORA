@@ -10,6 +10,8 @@ import StarterKit from '@tiptap/starter-kit';
 import UnderlineExtension from '@tiptap/extension-underline';
 import LinkExtension from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
+import { journalService } from '@/lib/firestore-service';
+import { useAuth } from '@/context/AuthContext';
 
 interface NewEntryJournalProps {
     isOpen: boolean;
@@ -18,6 +20,7 @@ interface NewEntryJournalProps {
 }
 
 export default function NewEntryJournal({ isOpen, onClose, editEntry }: NewEntryJournalProps) {
+    const { user } = useAuth();
     const [title, setTitle] = useState('');
     const [activeMood, setActiveMood] = useState('Okay');
     const [intensity, setIntensity] = useState(5);
@@ -129,35 +132,32 @@ export default function NewEntryJournal({ isOpen, onClose, editEntry }: NewEntry
     const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
     const handleAction = async (status: 'published' | 'draft') => {
-        if (!title || !editor || editor.isEmpty) return;
+        if (!title || !editor || editor.isEmpty || !user) return;
 
         setIsSaving(true);
         try {
-            const url = editEntry ? `/api/journal/${editEntry._id}` : '/api/journal';
-            const method = editEntry ? 'PATCH' : 'POST';
+            const id = editEntry?._id || editEntry?.id;
+            
+            const entryData = {
+                title,
+                content: editor.getHTML(),
+                mood: activeMood,
+                intensity,
+                tags,
+                status
+            };
 
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title,
-                    content: editor.getHTML(),
-                    mood: activeMood,
-                    intensity,
-                    tags,
-                    status
-                }),
-            });
-
-            if (response.ok) {
-                onClose();
-                window.location.reload();
+            if (id) {
+                await journalService.updateEntry(id, entryData);
             } else {
-                throw new Error('Failed to save entry');
+                await journalService.addEntry(user.uid, entryData);
             }
-        } catch (error) {
+
+            onClose();
+            window.location.reload();
+        } catch (error: any) {
             console.error('Save Error:', error);
-            alert('Failed to save entry. Please try again.');
+            alert('Failed to save entry: ' + error.message);
         } finally {
             setIsSaving(false);
         }

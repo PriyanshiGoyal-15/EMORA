@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from 'react';
+import { auth } from '@/lib/firebase';
+import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 
 export default function PasswordSettings() {
@@ -23,25 +25,28 @@ export default function PasswordSettings() {
       return;
     }
 
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+        setMessage({ type: 'error', text: 'User not authenticated' });
+        return;
+    }
+
     setLoading(true);
     setMessage({ type: '', text: '' });
 
     try {
-      const res = await fetch('/api/user/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setMessage({ type: 'success', text: 'Password updated successfully' });
-        setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Something went wrong' });
-      }
-    } catch (err) {
-      setMessage({ type: 'error', text: 'Failed to update password' });
+      // Re-authenticate user
+      const credential = EmailAuthProvider.credential(user.email, formData.currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      
+      // Update password
+      await updatePassword(user, formData.newPassword);
+      
+      setMessage({ type: 'success', text: 'Password updated successfully' });
+      setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err: any) {
+      console.error(err);
+      setMessage({ type: 'error', text: err.message || 'Failed to update password' });
     } finally {
       setLoading(false);
     }

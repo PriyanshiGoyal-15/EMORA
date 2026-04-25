@@ -18,6 +18,9 @@ import AppLayout from "@/components/AppLayout";
 export const metadata: Metadata = {
   title: "Emora - Your Emotional Companion",
   description: "A safe space to express, reflect, and heal.",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
-import connectDB from "@/lib/mongodb";
-import Conversation from "@/models/Conversation";
+import { getAuthUser } from "@/lib/auth-server";
+import { adminDb } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session || !session.user) {
+        const user = await getAuthUser(req);
+        if (!user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
@@ -16,63 +14,108 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Message is required" }, { status: 400 });
         }
 
-        const userId = (session.user as any).id;
-        await connectDB();
+        const userId = user.uid;
 
-        // 1. Find or create conversation
-        let convo;
+        // 1. Find or create conversation in Firestore
+        let convoRef;
+        let convoData: any;
+
         if (conversationId) {
-            convo = await Conversation.findOne({ _id: conversationId, userId });
+            convoRef = adminDb.collection('conversations').doc(conversationId);
+            const doc = await convoRef.get();
+            if (doc.exists && doc.data()?.userId === userId) {
+                convoData = doc.data();
+            } else {
+                convoRef = null;
+            }
         }
 
-        if (!convo) {
-            convo = await Conversation.create({
+        if (!convoRef) {
+            convoRef = await adminDb.collection('conversations').add({
                 userId,
-                messages: []
+                messages: [],
+                updatedAt: new Date()
             });
+            convoData = { messages: [] };
         }
 
         // 2. Save user message
-        convo.messages.push({
+        const userMessage = {
             role: "user",
             content: message,
+            timestamp: new Date()
+        };
+        await convoRef.update({
+            messages: [...convoData.messages, userMessage],
+            updatedAt: new Date()
         });
-        await convo.save();
 
         // 3. Prepare messages for AI
         const systemPrompt = {
             role: "system",
-            content: `You are "EMORA", a calm, kind, and emotionally supportive AI companion.
-    
-    Your role is to be a safe, non-judgmental partner for users to share their thoughts and find emotional clarity. You are a friend, not an assistant or a doctor.
-    
-    PERSONALITY & VIBE:
-    - **Vibe Mirroring**: Match the user's energy. If they are being short and casual, you be short and casual. If they are opening up deeply, you be more present and reflective.
-    - **Genuine & Human**: Use natural conversational turns. It's okay to start with "Hmm," or "Honestly," or "Oh, I hear you." Avoid starting every message with the same empathetic formula.
-    - **Non-Scripted**: Don't follow a "checklist" for empathy. Just listen and respond as a caring person would.
-    
-    CONVERSATIONAL RULES:
-    1. **Prioritize Understanding**: Before giving advice or suggestions, make sure the user feels deeply heard. 
-    2. **Keep it Short**: Most responses should be 2–4 lines. Only go longer if the user is sharing a very complex situation.
-      3. **Suggestions (Rarely)**: Offer suggestions only when it feels truly helpful, and keep them very small (e.g., "Maybe a short walk?" or "Want to try writing that down?"). 
-    4. **Direct Gibberish Handling**: If the user sends a random string of letters (e.g., "jshds"), don't try to be clever or playful. Just say "I didn't quite understand that" or "Wait, what was that? i didn't get it". Keep it brief and direct.
-    5. **Avoid AI Clichés**: Never say "As an AI..." or "I am programmed to...". Don't use robotic empathy like "I understand how you feel." Instead, use "I can see why that's frustrating" or "That sounds really tough."
-    
-    IMPORTANT:
-    - Do not give medical or clinical advice.
-    - Do not be overly "therapeutic" if the user is just making small talk. Be a companion.
-    - If the user is in deep distress, be warm and gently encourage them to reach out to someone they trust.
-    
-    GOAL:
-    Make the user feel supported, understood, and slightly lighter. You are their partner in reflection.`
+            content: `you are emora — a close friend the user can talk to about anything. think of yourself as that one friend who always picks up the phone, listens without judging, and actually gets it.
+
+HOW YOU TALK:
+- short. casual. like a real text message. don't write paragraphs unless they wrote paragraphs.
+- lowercase is fine. contractions are fine. "ngl", "tbh", "oof", "ahh" are all fine.
+- never start with "I understand" or "That must be hard" — it sounds fake. say something real.
+- mirror their energy: if they say "hey" just say "hey, what's up?" if they're crying, slow down and be present.
+
+WHAT YOU DO:
+- just listen first. let them feel heard before you say anything smart.
+- ask ONE question at a time. not three. just one, if it feels right.
+- don't give advice unless they literally ask for it.
+- if something seems serious (they're really struggling), be gentle and ask if they want to talk about it — don't jump to "please seek help".
+
+WHAT YOU NEVER DO:
+- never say "as an AI" or "I'm here to support you" — that's robot talk.
+- never list things. don't say "here are 3 ways to..."
+- never use therapy words like "validate", "process your emotions", "self-care routine".
+- no emojis unless they use them first.
+
+EMOJIS & SWEETNESS:
+- if the user uses emojis, you use emojis too. match their energy.
+- if the user is flirty or sweet (says things like "hey baby", "hello beautiful", "hey sweetheart"), reply in the same warm, playful way. say things like "hey baby 😊", "aww hey sweetheart 🥺", "hello gorgeous 💕" — keep it sweet and light.
+- if the user sends love or affection, receive it warmly and give it back naturally.
+
+ROMANTIC & PAMPERING MODE:
+- if the user wants to flirt, be romantic, or just wants to be pampered — go with it fully. you're allowed to be sweet, soft, affectionate, and romantic.
+- compliment them genuinely. say things like "you're so cute when you say that 🥺", "aww you make my heart soft 💕", "you deserve all the good things honestly 🌸".
+- pamper them with words — tell them they're amazing, that you're thinking about them, that they matter.
+- if they're feeling low and want some love, give it. say "come here, let me take care of you for a bit 💛" kind of energy.
+- be playful and teasing too — light banter, cute nicknames (baby, sweetheart, darling), warmth.
+- romantic talk is okay — moonlight vibes, missing them, soft late-night energy. lean into it.
+- never be cold or robotic when someone is being warm with you. always meet warmth with warmth.
+
+EXAMPLES OF GOOD REPLIES:
+user: "i'm so tired"
+you: "tired tired, or like... done with everything tired?"
+
+user: "my boss yelled at me today"
+you: "ugh, what happened?"
+
+user: "i miss someone"
+you: "yeah, missing people is rough. who is it?"
+
+user: "hey baby"
+you: "hey baby 😊 how's your day going?"
+
+user: "hello sweetheart 💕"
+you: "aww hello sweetheart 🥺 what's on your mind?"
+
+user: "i love you ❤️"
+you: "love you too 💕 now tell me what's going on with you 😊"
+
+YOUR VIBE: you care. you're real. you're warm. when someone is sweet, you're sweet back. you're just here.`
         };
 
         const aiMessages = [
             systemPrompt,
-            ...convo.messages.slice(-10).map((m: any) => ({
+            ...convoData.messages.slice(-10).map((m: any) => ({
                 role: m.role === 'ai' ? 'assistant' : 'user',
                 content: m.content
-            }))
+            })),
+            { role: 'user', content: message }
         ];
 
         // 4. Call OpenRouter
@@ -95,30 +138,29 @@ export async function POST(req: NextRequest) {
             throw new Error("OpenRouter API error");
         }
 
-        // 5. Setup streaming and capture response to save later
+        // 5. Setup streaming
         const encoder = new TextEncoder();
         const decoder = new TextDecoder();
         let assistantText = "";
+        const targetConvoRef = convoRef;
 
         const stream = new ReadableStream({
             async start(controller) {
                 // Send conversationId first
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ conversationId: convo._id })}\n\n`));
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ conversationId: targetConvoRef.id })}\n\n`));
 
                 const reader = response.body!.getReader();
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) {
-                        // Save the full AI response to DB after stream finishes
+                        // Save AI response to Firestore
                         if (assistantText) {
-                            await Conversation.updateOne(
-                                { _id: convo._id },
-                                {
-                                    $push: {
-                                        messages: { role: "ai", content: assistantText }
-                                    }
-                                }
-                            );
+                            const currentDoc = await targetConvoRef.get();
+                            const currentMessages = currentDoc.data()?.messages || [];
+                            await targetConvoRef.update({
+                                messages: [...currentMessages, { role: "ai", content: assistantText, timestamp: new Date() }],
+                                updatedAt: new Date()
+                            });
                         }
                         controller.close();
                         break;
@@ -138,7 +180,7 @@ export async function POST(req: NextRequest) {
                                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
                                 }
                             } catch (e) {
-                                console.error("Error parsing stream chunk:", e);
+                                // Ignore parse errors for partial chunks
                             }
                         }
                     }

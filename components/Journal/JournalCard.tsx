@@ -67,10 +67,8 @@ export default function JournalCard({ id, date, title, content, mood, emoji, tag
             className={`relative group rounded-[16px] overflow-hidden transition-all hover:scale-[1.01] flex flex-col h-full cursor-pointer ring-1 ring-inset ring-white/2 ${isDraft ? 'border-2 border-dashed border-navy/10 bg-navy/[0.02]' : 'bg-transparent border border-white/8 shadow-sm'
                 }`}
         >
-            {/* Top Mood Gradient Stripe */}
             <div className={`h-[3.5px] w-full bg-linear-to-r ${colors.gradient} ${isDraft ? 'opacity-30' : ''}`} />
 
-            {/* Status Badge */}
             {isDraft && (
                 <div className="absolute top-4 right-12 px-2 py-0.5 bg-navy/5 text-[8px] font-black uppercase tracking-widest text-navy/40 rounded-sm">
                     Draft

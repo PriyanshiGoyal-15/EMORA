@@ -9,20 +9,17 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@auth/mongodb-adapter": "^3.11.2",
     "@tiptap/extension-link": "^3.22.4",
     "@tiptap/extension-placeholder": "^3.22.4",
     "@tiptap/extension-underline": "^3.22.4",
     "@tiptap/pm": "^3.22.4",
     "@tiptap/react": "^3.22.4",
     "@tiptap/starter-kit": "^3.22.4",
-    "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
-    "jsonwebtoken": "^9.0.3",
+    "firebase": "^12.12.1",
+    "firebase-admin": "^10.1.0",
     "lucide-react": "^1.8.0",
-    "mongoose": "^9.5.0",
     "next": "16.2.4",
-    "next-auth": "^4.24.14",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tailwind-merge": "^3.5.0"

@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Leaf } from 'lucide-react';
+import { moodService } from '@/lib/firestore-service';
+import { useAuth } from '@/context/AuthContext';
 
 const moods = [
     { id: 'low', label: 'Low', emoji: '😔' },
@@ -12,48 +14,39 @@ const moods = [
 ];
 
 const EmojiSelector = ({ onMoodSaved }: { onMoodSaved?: () => void }) => {
+    const { user, loading: authLoading } = useAuth();
     const [selectedMood, setSelectedMood] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
 
     useEffect(() => {
-        // Fetch current mood for today
         const fetchMood = async () => {
+            if (authLoading || !user) return;
             try {
-                const res = await fetch('/api/mood');
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data && data.currentMood) {
-                        setSelectedMood(data.currentMood);
-                    }
+                const data = await moodService.getMoodData(user.uid);
+                if (data && data.currentMood) {
+                    setSelectedMood(data.currentMood);
                 }
             } catch (error) {
                 console.error('Error fetching mood:', error);
             }
         };
         fetchMood();
-    }, []);
+    }, [user, authLoading]);
 
     const handleMoodSelect = async (moodId: string, label: string) => {
-        if (isLoading) return;
+        if (isLoading || !user) return;
 
         setSelectedMood(moodId);
         setIsLoading(true);
 
         try {
-            const res = await fetch('/api/mood', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mood: moodId, label }),
-            });
-
-            if (!res.ok) {
-                throw new Error('Failed to save mood');
-            }
-
+            await moodService.addMood(user.uid, { mood: moodId, label });
+            setShowSuccess(true);
+            setTimeout(() => setShowSuccess(false), 3000);
             if (onMoodSaved) onMoodSaved();
         } catch (error) {
             console.error('Error saving mood:', error);
-            // Optionally revert UI state on error
         } finally {
             setIsLoading(false);
         }
@@ -76,6 +69,11 @@ const EmojiSelector = ({ onMoodSaved }: { onMoodSaved?: () => void }) => {
                     <p className="text-gray-400 text-sm md:text-base max-w-lg">
                         Check in, write your thoughts, or just say hello — Emora is here for all of it.
                     </p>
+                    {showSuccess && (
+                        <div className="absolute top-0 right-0 bg-green-500/20 text-green-400 text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full animate-in slide-in-from-top-2 fade-in">
+                            Mood logged successfully!
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex flex-wrap gap-3 md:gap-4 pt-2">
@@ -104,7 +102,7 @@ const EmojiSelector = ({ onMoodSaved }: { onMoodSaved?: () => void }) => {
                                         : 'bg-[#161B22] border border-white/5 hover:bg-[#1E293B] hover:border-white/10'
                                     }
                                 `}
-                                style={isActive ? { borderColor: activeColor, borderSize: '2px', borderStyle: 'solid', boxShadow: `0 0 15px ${activeColor}40` } : {}}
+                                style={isActive ? { borderColor: activeColor, borderWidth: '2px', borderStyle: 'solid', boxShadow: `0 0 15px ${activeColor}40` } : {}}
                             >
                                 <span className="text-2xl md:text-3xl mb-1">{mood.emoji}</span>
                                 <span className={`text-[10px] md:text-xs font-medium transition-colors duration-300 ${isActive ? '' : 'text-gray-500'}`} style={isActive ? { color: activeColor } : {}}>

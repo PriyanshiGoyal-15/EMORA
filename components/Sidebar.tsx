@@ -3,7 +3,10 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useSession, signOut } from 'next-auth/react';
+import { useAuth } from '@/context/AuthContext';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { userService } from '@/lib/firestore-service';
 import {
   LayoutDashboard,
   BookOpen,
@@ -35,25 +38,25 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const [userImage, setUserImage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const fetchUser = async () => {
+      if (!user) return;
       try {
-        const res = await fetch('/api/user/settings');
-        const data = await res.json();
-        if (res.ok && data.image) {
+        const data = await userService.getSettings(user.uid);
+        if (data && data.image) {
           setUserImage(data.image);
         }
       } catch (err) {
         console.error("Failed to fetch user image", err);
       }
     };
-    if (session) fetchUser();
-  }, [session]);
+    fetchUser();
+  }, [user]);
 
-  const userInitial = session?.user?.email ? session.user.email[0].toUpperCase() : session?.user?.name ? session.user.name[0].toUpperCase() : '?';
+  const userInitial = user?.email ? user.email[0].toUpperCase() : user?.displayName ? user.displayName[0].toUpperCase() : '?';
 
   return (
     <>
@@ -109,15 +112,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 hover:bg-white/10 transition-all group cursor-pointer border border-transparent hover:border-white/10"
           >
             <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center text-white font-bold text-lg shadow-inner overflow-hidden shrink-0">
-              {userImage || session?.user?.image ? (
-                <img src={userImage || session?.user?.image || ''} alt="Avatar" className="w-full h-full object-cover" />
+              {userImage || user?.photoURL ? (
+                <img src={userImage || user?.photoURL || ''} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
                 userInitial
               )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate leading-tight group-hover:text-primary transition-colors">
-                {session?.user?.name || 'User'}
+                {user?.displayName || 'User'}
               </p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -127,7 +130,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </Link>
 
           <button
-            onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+            onClick={() => signOut(auth)}
             className="w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-xl hover:bg-red-500/10 hover:text-red-400 transition-all font-bold text-xs"
           >
             <LogOut className="w-4 h-4" />

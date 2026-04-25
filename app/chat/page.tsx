@@ -1,7 +1,9 @@
 'use client'
 
 import React, { useState, useEffect, useRef, Suspense } from 'react';
-import { useSession } from "next-auth/react";
+import { useAuth } from '@/context/AuthContext';
+import { fetchWithAuth } from '@/lib/api-client';
+import { chatService } from '@/lib/firestore-service';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import DeleteModal from '@/components/DeleteModal';
 
@@ -34,7 +36,7 @@ export default function ChatPage() {
 }
 
 function ChatContent() {
-    const { data: session } = useSession();
+    const { user, loading: authLoading } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
     const pathname = usePathname();
@@ -53,9 +55,11 @@ function ChatContent() {
     };
 
     useEffect(() => {
-        const initialId = searchParams.get('id');
-        fetchConversations(initialId);
-    }, []);
+        if (!authLoading && user) {
+            const initialId = searchParams.get('id');
+            fetchConversations(initialId);
+        }
+    }, [user, authLoading]);
 
     // Sync URL with currentConvoId
     useEffect(() => {
@@ -73,18 +77,16 @@ function ChatContent() {
     }, [messages]);
 
     const fetchConversations = async (autoLoadId?: string | null) => {
+        if (!user) return;
         try {
-            const res = await fetch('/api/conversations');
-            if (res.ok) {
-                const data = await res.json();
-                setConversations(data);
+            const data = await chatService.getConversations(user.uid);
+            setConversations(data as any);
 
-                if (autoLoadId) {
-                    const target = data.find((c: Conversation) => c.id === autoLoadId);
-                    if (target) {
-                        setCurrentConvoId(target.id);
-                        setMessages(target.messages);
-                    }
+            if (autoLoadId) {
+                const target = data.find((c: any) => c.id === autoLoadId);
+                if (target) {
+                    setCurrentConvoId(target.id);
+                    setMessages(target.messages);
                 }
             }
         } catch (error) {
@@ -113,9 +115,8 @@ function ChatContent() {
         setIsLoading(true);
 
         try {
-            const res = await fetch('/api/chat', {
+            const res = await fetchWithAuth('/api/chat', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: text,
                     conversationId: currentConvoId
@@ -164,14 +165,10 @@ function ChatContent() {
     const deleteCurrentConversation = async () => {
         if (!currentConvoId) return;
         try {
-            const res = await fetch(`/api/conversations?id=${currentConvoId}`, {
-                method: 'DELETE',
-            });
-            if (res.ok) {
-                setConversations(prev => prev.filter(c => c.id !== currentConvoId));
-                startNewChat();
-                setIsDeleteModalOpen(false);
-            }
+            await chatService.deleteConversation(currentConvoId);
+            setConversations(prev => prev.filter(c => c.id !== currentConvoId));
+            startNewChat();
+            setIsDeleteModalOpen(false);
         } catch (error) {
             console.error("Error deleting conversation:", error);
         }
@@ -186,8 +183,8 @@ function ChatContent() {
                 onNewChat={startNewChat}
                 isOpen={isHistoryOpen}
                 onClose={() => setIsHistoryOpen(false)}
-                userName={session?.user?.name || 'User'}
-                userEmail={session?.user?.email || ''}
+                userName={user?.displayName || 'User'}
+                userEmail={user?.email || ''}
             />
 
             <div className="flex-1 flex flex-col relative bg-[#F8FAFF] w-full">
@@ -202,7 +199,7 @@ function ChatContent() {
                     messages={messages}
                     isLoading={isLoading}
                     messagesEndRef={messagesEndRef}
-                    userName={session?.user?.name?.split(' ')[0]}
+                    userName={user?.displayName?.split(' ')[0]}
                     onSuggestionClick={sendMessage}
                 />
 

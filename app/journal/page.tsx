@@ -6,7 +6,11 @@ import JournalCard from '@/components/Journal/JournalCard';
 import NewEntryJournal from '@/components/Journal/NewEntryJournal';
 import { Loader2, Plus } from 'lucide-react';
 
+import { journalService } from '@/lib/firestore-service';
+import { useAuth } from '@/context/AuthContext';
+
 export default function JournalPage() {
+    const { user, loading: authLoading } = useAuth();
     const [entries, setEntries] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -21,15 +25,19 @@ export default function JournalPage() {
     const [activeFilter, setActiveFilter] = useState('All');
 
     useEffect(() => {
-        fetchEntries();
-    }, []);
+        if (!authLoading && user) {
+            fetchEntries();
+        } else if (!authLoading && !user) {
+            setIsLoading(false);
+            setError("Please sign in to view your journal.");
+        }
+    }, [user, authLoading]);
 
     const fetchEntries = async () => {
+        if (!user) return;
         setIsLoading(true);
         try {
-            const response = await fetch('/api/journal');
-            if (!response.ok) throw new Error('Failed to fetch entries');
-            const data = await response.json();
+            const data = await journalService.getEntries(user.uid);
             setEntries(data);
         } catch (err: any) {
             setError(err.message);
@@ -51,14 +59,8 @@ export default function JournalPage() {
 
     const handleDelete = async (id: string) => {
         try {
-            const response = await fetch(`/api/journal/${id}`, {
-                method: 'DELETE',
-            });
-            if (response.ok) {
-                setEntries(prev => prev.filter(entry => entry._id !== id));
-            } else {
-                throw new Error('Failed to delete entry');
-            }
+            await journalService.deleteEntry(id);
+            setEntries(prev => prev.filter(entry => (entry._id || entry.id) !== id));
         } catch (err: any) {
             alert('Error deleting entry: ' + err.message);
         }
@@ -115,9 +117,9 @@ export default function JournalPage() {
                     {filteredEntries.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 px-4 pb-10">
                             {filteredEntries.map((entry) => (
-                                <div key={entry._id} className="h-full">
+                                <div key={entry._id || entry.id} className="h-full">
                                     <JournalCard
-                                        id={entry._id}
+                                        id={entry._id || entry.id}
                                         date={formatDate(entry.timestamp)}
                                         title={entry.title}
                                         content={entry.content}
