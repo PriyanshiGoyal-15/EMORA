@@ -62,6 +62,3 @@ OPENROUTER_API_KEY=your_openrouter_key
 ```bash
 npm run dev
 ```
-
-**Built with ❤️ for better mental wellness.**
-```
