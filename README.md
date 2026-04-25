@@ -3,11 +3,8 @@ Here is a **professional, high-fidelity `README.md`** template for your project.
 ```markdown
 # 🪐 EMORA — Your AI Emotional Companion
 
-![Emora Banner](/public/og-image.png)
-
 > **Emora** is a sophisticated, empathetic AI-driven wellness ecosystem engineered to provide a safe, high-fidelity space for emotional reflection and mental clarity.
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen.svg)](https://getemoraai.vercel.app/)
 ---
 
 ## ✨ Key Features
