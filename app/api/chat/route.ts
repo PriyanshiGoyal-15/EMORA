@@ -9,6 +9,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        if (!adminDb) {
+            return NextResponse.json({ error: "Firebase Admin SDK not initialized" }, { status: 500 });
+        }
+
         const { message, conversationId } = await req.json();
         if (!message) {
             return NextResponse.json({ error: "Message is required" }, { status: 400 });

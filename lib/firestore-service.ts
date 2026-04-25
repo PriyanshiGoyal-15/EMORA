@@ -117,7 +117,7 @@ export const moodService = {
       id: doc.id,
       ...doc.data(),
       timestamp: (doc.data().timestamp as Timestamp).toDate()
-    }));
+    })) as any[];
 
     // Replicate aggregation logic from API
     const breakdownMap: Record<string, { count: number, label: string }> = {};
@@ -511,7 +511,7 @@ export const moodService = {
 
       // Average Mood
       const moodCounts: Record<string, number> = {};
-      moods.forEach(m => {
+      moods.forEach((m: any) => {
         if (m.mood) moodCounts[m.mood] = (moodCounts[m.mood] || 0) + 1;
       });
       const sortedMoods = Object.entries(moodCounts).sort((a, b) => b[1] - a[1]);

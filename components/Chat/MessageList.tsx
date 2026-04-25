@@ -1,15 +1,12 @@
 import React from 'react';
 import { Sparkles, Wind, Check } from 'lucide-react';
 
-interface Message {
-    role: 'user' | 'ai';
-    content: string;
-}
+import { Message } from '@/lib/types';
 
 interface MessageListProps {
     messages: Message[];
     isLoading: boolean;
-    messagesEndRef: React.RefObject<HTMLDivElement>;
+    messagesEndRef: React.RefObject<HTMLDivElement | null>;
     userName?: string;
     onSuggestionClick: (text: string) => void;
 }

@@ -13,19 +13,7 @@ import ChatHeader from '@/components/Chat/ChatHeader';
 import MessageList from '@/components/Chat/MessageList';
 import ChatInput from '@/components/Chat/ChatInput';
 
-interface Message {
-    role: 'user' | 'ai';
-    content: string;
-    createdAt?: Date;
-}
-
-interface Conversation {
-    id: string;
-    title: string;
-    preview: string;
-    date: string;
-    messages: Message[];
-}
+import { Message, Conversation } from '@/lib/types';
 
 export default function ChatPage() {
     return (

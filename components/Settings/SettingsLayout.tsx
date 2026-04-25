@@ -9,7 +9,7 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-type Section = 'profile' | 'notifications' | 'appearance' | 'password' | 'billing';
+import { SettingsSection as Section } from '@/lib/types';
 
 interface SettingsLayoutProps {
   activeSection: Section;

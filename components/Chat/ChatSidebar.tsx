@@ -1,12 +1,7 @@
 import React from 'react';
 import { Plus, X } from 'lucide-react';
 
-interface Conversation {
-    id: string;
-    title: string;
-    preview: string;
-    date: string;
-}
+import { Conversation } from '@/lib/types';
 
 interface ChatSidebarProps {
     conversations: Conversation[];

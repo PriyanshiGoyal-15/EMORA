@@ -13,6 +13,7 @@ interface JournalCardProps {
     tags?: string[];
     status?: 'draft' | 'published';
     onDelete?: (id: string) => void;
+    onEdit?: () => void;
     onClick?: () => void;
 }
 
@@ -51,7 +52,7 @@ const moodColors: Record<string, { gradient: string, bg: string, text: string, t
 
 import { Trash2, Edit3 } from 'lucide-react';
 
-export default function JournalCard({ id, date, title, content, mood, emoji, tags = [], status = 'published', onDelete, onClick }: JournalCardProps) {
+export default function JournalCard({ id, date, title, content, mood, emoji, tags = [], status = 'published', onDelete, onEdit, onClick }: JournalCardProps) {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const colors = moodColors[mood] || moodColors.Neutral;
     const isDraft = status === 'draft';
@@ -77,7 +78,7 @@ export default function JournalCard({ id, date, title, content, mood, emoji, tag
 
             <div className="absolute top-4 right-4 opacity-100 md:opacity-60 md:group-hover:opacity-100 transition-opacity z-10 flex gap-2">
                 <button
-                    onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+                    onClick={(e) => { e.stopPropagation(); onEdit?.(); }}
                     className="p-2 bg-white/80 backdrop-blur-sm text-primary hover:bg-primary/5 rounded-lg shadow-sm transition-all"
                 >
                     <Edit3 size={14} />

@@ -5,7 +5,7 @@ import SettingsLayout from '@/components/Settings/SettingsLayout';
 import ProfileSettings from '@/components/Settings/ProfileSettings';
 import PasswordSettings from '@/components/Settings/PasswordSettings';
 
-type Section = 'profile' | 'notifications' | 'appearance' | 'password';
+import { SettingsSection as Section } from '@/lib/types';
 
 const PlaceholderSection = ({ title, icon }: { title: string, icon: string }) => (
     <div className="flex flex-col items-center justify-center py-20 text-center">
